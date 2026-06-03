@@ -50,4 +50,4 @@ vault
 */integration/*.jsonl
 
 # felix test
-felix_test/.reme_test
+felix_test/.*

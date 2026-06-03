@@ -241,7 +241,7 @@ def main():
         as_token_counter="default",        # 使用默认 token 计数器
         language="zh",                     # 摘要语言：zh = 中文
         max_input_length=128 * 1024,       # 模型上下文窗口（128K tokens）
-        compact_ratio=0.7,                 # 达到 max_input_length × 0.7 时触发内部压缩
+        compact_ratio=0.7,                 # 送给 LLM 的消息上限 = max_input_length × 0.7 × 0.95，超出部分（更老的消息）直接丢弃
         previous_summary="",              # 上轮摘要（首次为空字符串）
         return_dict=False,                 # False = 返回字符串；True = 返回 dict
         add_thinking_block=True,           # 生成摘要前加入思考步骤，提升摘要质量
@@ -265,7 +265,7 @@ def main():
         toolkit=None,                      # None = 自动创建含 read/write/edit 的 FileIO toolkit
         language="zh",                     # 摘要语言
         max_input_length=128 * 1024,       # 模型上下文窗口
-        compact_ratio=0.7,                 # 压缩阈值比例
+        compact_ratio=0.7,                 # 送给 LLM 的消息上限 = max_input_length × 0.7 × 0.95，超出部分（更老的消息）直接丢弃
         timezone=None,                     # None = 使用系统本地时区确定文件日期
         add_thinking_block=True,           # 加入思考步骤
     ))
