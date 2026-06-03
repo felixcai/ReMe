@@ -422,3 +422,60 @@ result = S(my_summarizer.call(
 
 在我们的测试脚本里，直接 `S(reme.compact_memory(...))` 和 `S(reme.summary_memory(...))` 都是同步阻塞调用，不产生后台任务，所以 `reme.summary_tasks` 始终是空列表，`await_summary_tasks()` 立即返回。
 
+
+# 混合搜索（切词）
+
+```
+    search_result = S(reme.memory_search(
+        query="JWT token 刷新机制",
+        max_results=5,
+        min_score=0.1,
+    ))
+```
+
+整个流程中，**没有做任何中文分词**（如 jieba 等）。以下是 query 的实际处理路径：
+
+**`hybrid_search` = 向量搜索 + 关键词搜索 (FTS) 混合**
+
+---
+
+**1. 向量搜索部分**
+
+query 原样送入 embedding 模型，由模型内部的 tokenizer 处理，Python 层不做任何预处理。
+
+---
+
+**2. 关键词搜索部分（FTS）**
+
+对 query `"JWT token 刷新机制"` 的处理步骤如下：
+
+**Step 1 - Sanitize**：去除 FTS5 特殊字符（`*/?:+-` 等），归一化空白
+
+```609:681:reme/core/file_store/sqlite_file_store.py
+    def _sanitize_fts_query(query: str) -> str:
+        ...
+        cleaned = " ".join(cleaned.split())
+        return cleaned
+```
+
+**Step 2 - 按空格切分**：`cleaned.split()` → `["JWT", "token", "刷新机制"]`
+
+**Step 3 - 选择搜索策略**：所有词 `len >= 3` → 走 FTS5 trigram 路径
+
+```692:714:reme/core/file_store/sqlite_file_store.py
+        # FTS5 trigram (fast path): used when ALL terms >= 3 chars (trigram minimum).
+        # LIKE (universal fallback): used when any term < 3 chars, covering CJK
+        #   short words, single/double-char queries, and mixed-length queries.
+```
+
+**Step 4 - FTS5 Trigram 搜索**：构造 `JWT OR token OR 刷新机制` 作为 FTS 查询语句，数据库层面 trigram tokenizer 将文本按每 3 个字符一组建立索引（字符级三元组，对中文字符也是字符计数）。
+
+---
+
+**结论**
+
+- 不用 jieba 等分词器
+- 中文 query 靠**空格**切分词（所以 `"刷新机制"` 作为一个整体词去搜，而不是 `["刷新", "机制"]`）
+- FTS5 trigram 是字符级 n-gram，和语言无关
+- 向量侧依赖 embedding 模型内置 tokenizer
+
