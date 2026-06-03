@@ -48,3 +48,6 @@ memories/*
 .reme/*
 vault
 */integration/*.jsonl
+
+# felix test
+felix_test/.reme_test
